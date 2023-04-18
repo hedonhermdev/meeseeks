@@ -30,3 +30,21 @@ impl TaskExecutor for Calculator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{tool::Calculator, common::TaskExecutor, meeseeks_proto::{TaskRequest, Status}};
+
+    #[tokio::test]
+    pub async fn test_calculator() {
+        let calc = Calculator;
+        let res = calc.exec(TaskRequest {
+            instruction: "calculate".to_string(),
+            args: vec!["17 * 9".to_string(), "what is 17 * 9?".to_string()],
+        }).await;
+
+        println!("{:?}", res);
+
+        assert_eq!(res.status, Into::<i32>::into(Status::Success))
+    }
+}

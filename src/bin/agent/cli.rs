@@ -18,7 +18,9 @@ pub struct AgentCli {
     #[arg(short, long)]
     tool: String,
     #[arg(short, long)]
-    addr: SocketAddr,
+    listen: SocketAddr,
+    #[arg(short, long)]
+    addr: String,
     #[arg(short, long)]
     master: String,
 }
@@ -29,15 +31,14 @@ impl AgentCli {
 
         let tool = tool_from_name(&args.tool)?;
 
-        let mut agent_addr = "http://".to_string();
-        agent_addr.push_str(&args.addr.to_string());
+        let agent_addr = args.addr;
         let mut agent = Agent::new(args.name, args.description, agent_addr, tool);
 
         agent.connect_to_master(args.master).await?;
 
         Server::builder()
             .add_service(agent_server::AgentServer::new(agent))
-            .serve(args.addr)
+            .serve(args.listen)
             .await?;
 
         Ok(())

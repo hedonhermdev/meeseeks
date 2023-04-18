@@ -4,8 +4,8 @@ use tonic::{transport::Channel, Request, Response, Status};
 use async_mutex::Mutex;
 
 use crate::meeseeks_proto::{
-    self, agent_client::AgentClient, AgentConnectRequest, AgentConnectResponse, TaskRequest,
-    TaskResponse,
+    self, agent_client::AgentClient, AgentConnectRequest, AgentConnectResponse, AgentInfo,
+    ConnectedAgentInfo, EmptyParams, TaskRequest, TaskResponse
 };
 
 struct ConnectedAgent {
@@ -60,9 +60,7 @@ impl MasterAgent {
 }
 
 #[tonic::async_trait]
-impl meeseeks_proto::master_agent_server::MasterAgent
-    for Arc<MasterAgent>
-{
+impl meeseeks_proto::master_agent_server::MasterAgent for Arc<MasterAgent> {
     async fn connect_to_master(
         &self,
         request: Request<AgentConnectRequest>,
@@ -79,12 +77,31 @@ impl meeseeks_proto::master_agent_server::MasterAgent
         agents.insert(req.name, agent);
         drop(agents);
 
-        println!("agent connected: {}", agent_addr);
         let res = AgentConnectResponse {
             status: meeseeks_proto::Status::Success.into(),
             message: "".into(),
         };
 
         Ok(Response::new(res))
+    }
+
+    async fn connected_agents(
+        &self,
+        _: Request<EmptyParams>,
+    ) -> Result<Response<ConnectedAgentInfo>, Status> {
+        let agents = self.agents.lock().await;
+
+        let mut connected_agents = Vec::new();
+        for (name, agent) in agents.iter() {
+            let info = AgentInfo {
+                name: name.to_string(),
+                description: agent.description.to_string(),
+            };
+            connected_agents.push(info);
+        }
+
+        Ok(Response::new(ConnectedAgentInfo {
+            agents: connected_agents,
+        }))
     }
 }

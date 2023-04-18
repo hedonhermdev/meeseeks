@@ -174,12 +174,12 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn test_anne_hathaway() -> color_eyre::Result<()> {
+    async fn test_nelson_mandela() -> color_eyre::Result<()> {
         let wiki = Wiki::new();
 
         let res = wiki.exec(TaskRequest {
             instruction: "summary".to_string(),
-            args: vec!["Anne Hathaway".to_string(), ".....".to_string()],
+            args: vec!["Nelson Mandela".to_string(), ".....".to_string()],
         }).await;
 
         println!("{:?}", res);

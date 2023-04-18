@@ -11,46 +11,67 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, crane, ... }: let
-    # System types to support.
-    supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, crane, ... }:
+    let
+      # System types to support.
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
 
-    # Rust nightly version.
-    nightlyVersion = "2022-12-04";
-  in flake-utils.lib.eachSystem supportedSystems (system: let
-    pkgs = import nixpkgs {
-      inherit system;
-      overlays = [ (import rust-overlay) ];
-    };
+      # Rust nightly version.
+      nightlyVersion = "2022-12-04";
+    in
+    flake-utils.lib.eachSystem supportedSystems (system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ (import rust-overlay) ];
+        };
 
-    rustNightly = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
-      extensions = [ "rust-src" "rust-analyzer-preview" ];
-      targets = [ "x86_64-unknown-linux-gnu" ];
-    };
-    craneLib = (crane.mkLib pkgs).overrideToolchain rustNightly;
+        rustNightly = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
+          extensions = [ "rust-src" "rust-analyzer-preview" ];
+          targets = [ "x86_64-unknown-linux-gnu" ];
+        };
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustNightly;
 
-    src = craneLib.cleanCargoSource ./.;
+        # src = craneLib.cleanCargoSource ./.;
+        src = ./.;
 
-    meeseeksPackage = craneLib.buildPackage {
-      inherit src;
-      nativeBuildInputs = with pkgs; [
-        clang
-        cmake
-      ];
-    };
-  in {
-    devShell = pkgs.mkShell {
-      nativeBuildInputs = with pkgs; [
-        rustNightly
-        protobuf
-        grpcurl
-        pkg-config
-        openssl
-      ];
-    };
+        meeseeksPackage = craneLib.buildPackage {
+          inherit src;
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            openssl
+            gcc
+            protobuf
+          ];
+          doCheck = false;
+        };
+        meeseeksDockerImage = pkgs.dockerTools.buildImage {
+          name = "meeseeks";
+          tag = "latest";
+          fromImageName = "alpine";
+          fromImageTag = "latest";
 
-    packages = {
-      default = meeseeksPackage;
-    };
-  });
+          copyToRoot = pkgs.buildEnv {
+            name = "image-root";
+            paths = [ meeseeksPackage pkgs.bash pkgs.coreutils-full ];
+            pathsToLink = [ "/bin" ];
+          };
+        };
+      in
+      {
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            rustNightly
+            protobuf
+            grpcurl
+            pkg-config
+            openssl
+          ];
+        };
+
+        packages = {
+          default = meeseeksPackage;
+          meeseeksDocker = meeseeksDockerImage;
+        };
+      });
 }
