@@ -1,0 +1,23 @@
+You are given a list of tools followed by a list of tasks. Select the most appropriate tool to complete each task. You can only use the given tools and nothing else. If no tool can complete the given task, respond with none.
+### TOOLS ###
+- calculate(expression)
+- tweet(topic)
+- search(query)
+- summary(topic)
+### TASKS ###
+1. what is 999 - 1?
+2. write a tweet about Github's new feature release.
+3. write a short paragraph about Elon Musk.
+4. who was the first prime minister of UK?
+### RESPONSE ###
+1. calculate(999 - 1)
+2. tweet(Github's new feature release)
+3. summary(Elon Musk)
+4. search(first prime minister of UK)
+
+### TASKS ###
+1. what is 10 * 100?
+2. write a tweet about  Rick and Morty's last episode.
+3. who is the current CEO of Uber?
+4. write a short paragraph about Fischer Jordan.
+### RESPONSE ###

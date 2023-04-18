@@ -1,0 +1,36 @@
+syntax = "proto3";
+package meeseeks_v1;
+
+service MasterAgent {
+    rpc ConnectToMaster(AgentConnectRequest) returns (AgentConnectResponse);
+}
+
+service Agent {
+    rpc ExecTask(TaskRequest) returns (TaskResponse);   
+}
+
+message AgentConnectRequest {
+   string name = 1;
+   string from = 2;
+   string description = 3;
+}
+
+message AgentConnectResponse {
+    Status status = 1;
+    string message = 2;
+}
+
+enum Status {
+    Success = 0;
+    Failure = 1;
+}
+
+message TaskRequest {
+    string instruction = 1;
+    repeated string args = 2;
+}
+
+message TaskResponse {
+    Status status = 1;
+    string response = 2;
+}

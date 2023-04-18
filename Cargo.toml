@@ -1,0 +1,33 @@
+[package]
+name = "meeseeks"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tonic = "0.9"
+prost = "0.11"
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+async-mutex = "1.4.0"
+thiserror = "1.0.40"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
+color-eyre = "0.6.2"
+meval = "0.2.0"
+openai-api = { git = "https://github.com/deontologician/openai-api-rust", rev = "e844a48" }
+wikipedia = "0.3.4"
+clap = { version = "4.2.2", features = ["derive"] }
+lazy_static = "1.4.0"
+llama-rs = { path = "./llama-rs/llama-rs/" }
+rand = "0.8.5"
+num_cpus = "1.15.0"
+dyn-fmt = "0.3.0"
+regex = "1.7.3"
+spinners = "4.1.0"
+reqwest = { version = "0.11", features = ["json"] }
+serde = "1.0.160"
+serde_json = "1.0.96"
+
+[build-dependencies]
+tonic-build = "0.9"
