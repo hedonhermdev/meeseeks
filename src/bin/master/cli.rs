@@ -69,14 +69,14 @@ impl MasterCli {
         let mut len = 0;
 
         loop {
-            println!("--- Command ---");
+            println!("--- Command --- (enter help for a list of commands) ");
             print!("> ");
             std::io::stdout().flush()?;
             let stdin = std::io::stdin();
             len = stdin.read_line(&mut line)?;
             match line.trim() {
                 "input" => {
-                    println!("--- Input ---");
+                    println!("--- Input --- ");
                     print!("> ");
                     std::io::stdout().flush()?;
 
