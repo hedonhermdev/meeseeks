@@ -59,8 +59,6 @@ impl<Matcher: AgentMatcher + Send + Sync> MasterAgent<Matcher> {
             .get_mut(name)
             .ok_or("failed to get client with name: {name}")?;
 
-        tracing::info!("sending task to agent: {}", name);
-        tracing::debug!("task: {:?}, agent: {}", task, name);
         if agent.client.is_none() {
             tracing::debug!("agent \"{}\" client is not connected. connecting...", name);
             let client = AgentClient::connect(agent.addr.clone()).await?;

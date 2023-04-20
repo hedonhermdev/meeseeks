@@ -58,9 +58,6 @@ impl LlamaParser {
 
         let text = RefCell::new(String::new());
 
-        println!("Trying to parse input:\n{}", input);
-        println!("Using prompt: \n{}", prompt);
-
         let mut sp = spinners::Spinner::new(
             spinners::Spinners::Dots9,
             "Running inference on input".into(),
@@ -112,13 +109,11 @@ impl LlamaParser {
                         Ok(task)
                     }
                     _ => {
-                        println!("here");
                         bail!("failed to infer task")
                     }
                 }
             }
             None => {
-                println!("or here");
                 bail!("failed to infer task")
             }
         }
