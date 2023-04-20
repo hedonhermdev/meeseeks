@@ -1,0 +1,9 @@
+Input: What is the capital of India?
+Thought: I use the question tool to answer questions.
+Action: question[capital of India]
+Input: Write a tiny paragraph about Nelson Mandela
+Thought: I use the summary tool to write paragraphs about something.
+Action: summary[Nelson Mandela]
+Input: Write a short paragraph about Brazil
+Thought: I use the summary tool to write paragraphs about something.
+Action: summary[Brazil]

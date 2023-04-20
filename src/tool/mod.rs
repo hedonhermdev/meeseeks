@@ -11,6 +11,7 @@ use crate::{
     meeseeks_proto::{TaskRequest, TaskResponse},
 };
 
+
 pub enum Tool {
     Calculator(Calculator),
     Tweetu(Tweetu),
@@ -24,6 +25,22 @@ impl TaskExecutor for Tool {
             Tool::Calculator(calc) => calc.exec(req).await,
             Tool::Tweetu(tweetu) => tweetu.exec(req).await,
             Tool::Wiki(wiki) => wiki.exec(req).await,
+        }
+    }
+
+    fn commands<'a>(&self) -> &'a [&'a str] {
+        match self {
+            Tool::Calculator(calc) => calc.commands(),
+            Tool::Tweetu(tweetu) => tweetu.commands(),
+            Tool::Wiki(wiki) => wiki.commands(),
+        }
+    }
+
+    fn examples<'a>(&self) -> &'a str {
+        match self {
+            Tool::Calculator(calc) => calc.examples(),
+            Tool::Tweetu(tweetu) => tweetu.examples(),
+            Tool::Wiki(wiki) => wiki.examples(),
         }
     }
 }

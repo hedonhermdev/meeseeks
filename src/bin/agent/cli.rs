@@ -4,7 +4,7 @@ use clap::Parser;
 use meeseeks::{
     agent::Agent,
     meeseeks_proto::agent_server,
-    tool::{Calculator, Tool, Tweetu, Wiki},
+    tool::{Calculator, Tool, Tweetu, Wiki}, common::TaskExecutor,
 };
 use tonic::transport::Server;
 
@@ -32,7 +32,9 @@ impl AgentCli {
         let tool = tool_from_name(&args.tool)?;
 
         let agent_addr = args.addr;
-        let mut agent = Agent::new(args.name, args.description, agent_addr, tool);
+        let commands = tool.commands().iter().map(|x| x.to_string()).collect();
+        let examples = tool.examples().into();
+        let mut agent = Agent::new(args.name, args.description, agent_addr, tool, commands, examples);
 
         agent.connect_to_master(args.master).await?;
 

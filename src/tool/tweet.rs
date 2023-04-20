@@ -18,6 +18,9 @@ Tweetu:
 const OPENAI_COMPLETION_API_URL: &'static str = "https://api.openai.com/v1/completions";
 const OPENAI_MODEL_NAME: &'static str = "text-davinci-003";
 
+const COMMANDS: &[&'static str] = &["tweet(topic)"];
+const EXAMPLES: &'static str = include_str!("../../prompts/tweetu.txt");
+
 pub struct Tweetu {
     client: reqwest::Client,
 }
@@ -69,7 +72,7 @@ impl Tweetu {
 impl TaskExecutor for Tweetu {
     async fn exec(&self, task: TaskRequest) -> TaskResponse {
         match task.instruction.as_str() {
-            "tweet" | "tweeit" => {
+            "twee" | "tweet" | "tweeit" | "tweeet" => {
                 let topic = &task.args[0];
                 match self.get_tweet(topic).await {
                     Ok(tweet) => TaskResponse {
@@ -84,10 +87,19 @@ impl TaskExecutor for Tweetu {
             }
             _ => TaskResponse {
                 status: Status::Failure.into(),
-                response: "invalid instruction. available instructions are: [\"tweet\", \"tweeit\"]".to_string()
+                response: "invalid instruction. available instructions are: [\"tweet\"]".to_string()
             }
         }
     }
+
+    fn commands<'a>(&self) -> &'a[&'a str] {
+        COMMANDS
+    }
+
+    fn examples<'a>(&self) -> &'a str {
+        EXAMPLES
+    }
+
 }
 
 #[cfg(test)]

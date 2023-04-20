@@ -17,10 +17,12 @@ pub struct Agent<Executor: TaskExecutor> {
     master_addr: Option<String>,
     client: Option<MasterAgentClient<Channel>>,
     executor: Executor,
+    commands: Vec<String>,
+    examples: String,
 }
 
 impl<T: TaskExecutor> Agent<T> {
-    pub fn new(name: String, description: String, addr: String, executor: T) -> Self {
+    pub fn new(name: String, description: String, addr: String, executor: T, commands: Vec<String>, examples: String) -> Self {
         Agent {
             name,
             description,
@@ -28,6 +30,8 @@ impl<T: TaskExecutor> Agent<T> {
             executor,
             master_addr: None,
             client: None,
+            commands,
+            examples,
         }
     }
 
@@ -42,6 +46,8 @@ impl<T: TaskExecutor> Agent<T> {
                 name: self.name.clone(),
                 description: self.description.clone(),
                 from: self.addr.to_string(),
+                examples: self.examples.clone(),
+                commands: self.commands.clone(),
             })
             .await?;
 

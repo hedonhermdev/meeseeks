@@ -1,38 +1,48 @@
-use meeseeks::{llama_parser::LlamaParser, meeseeks_proto::{master_agent_server, Status}};
+use meeseeks::{
+    common::ConnectedAgent,
+    llama_parser::LlamaParser,
+    master::MasterAgent,
+    meeseeks_proto::{master_agent_server, Status, TaskRequest},
+    tooldb::ToolDB,
+};
+use reqwest::Url;
 use std::{
+    collections::VecDeque,
+    io::{self, stdin, BufRead, StdinLock, Write},
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
+    process::exit,
     sync::Arc,
 };
 
 use tonic::transport::Server;
 
 use clap::Parser;
-use meeseeks::master::MasterAgent;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct MasterCli {
-    #[arg(short, long)]
+    #[arg(long)]
     name: String,
-    #[arg(short, long)]
+    #[arg(long)]
     listen: SocketAddr,
-    #[arg(short, long)]
+    #[arg(long)]
     addr: String,
     #[arg(short = 'm', long = "model-path")]
     llama_model_path: PathBuf,
+    #[arg(long = "tooldb-url")]
+    tooldb_url: Url,
 }
 
 impl MasterCli {
     pub async fn run() -> color_eyre::Result<()> {
         let args = MasterCli::parse();
 
-        let mut master_addr = args.addr;
-
-        let master = Arc::new(MasterAgent::new(args.name, args.listen));
+        let tooldb = ToolDB::new(args.tooldb_url)?;
+        let master = Arc::new(MasterAgent::new(args.name, args.listen, tooldb));
         let master_c = master.clone();
 
-        let join = tokio::spawn(async move {
+        let _join = tokio::spawn(async move {
             tracing::info!("master is listening on address: {}", args.listen);
             match Server::builder()
                 .add_service(master_agent_server::MasterAgentServer::new(master_c))
@@ -46,78 +56,157 @@ impl MasterCli {
             }
         });
 
+        let mut sp =
+            spinners::Spinner::new(spinners::Spinners::Dots9, "Loading llama model".to_string());
         let parser =
             LlamaParser::init(&args.llama_model_path).expect("failed to initialize llama parser");
+        sp.stop();
+        println!("");
+
+        let mut line = String::new();
+        let mut input_tasks = VecDeque::new();
+        let mut tasks = VecDeque::new();
+        let mut len = 0;
 
         loop {
-            println!("INPUT: ");
-            let input = get_input()?;
+            println!("--- Command ---");
+            print!("> ");
+            std::io::stdout().flush()?;
+            let stdin = std::io::stdin();
+            len = stdin.read_line(&mut line)?;
+            match line.trim() {
+                "input" => {
+                    println!("--- Input ---");
+                    print!("> ");
+                    std::io::stdout().flush()?;
 
-            let mut tasks = Vec::new();
-
-            if parser.parse(&input, &mut tasks).is_err() {
-                color_eyre::eyre::bail!("failed to parse tasks");
-            }
-
-            let mut results = Vec::new();
-
-            for task in tasks {
-                let task_c = task.clone();
-                let agent = match task.instruction.as_str() {
-                    "tweet" | "tweeit" => "meeseeks-tweetu",
-                    "search" => "meeseeks-wiki",
-                    "summary" => "meeseeks-wiki",
-                    "calculate" => "meeseeks-calculator",
-                    _ => "none",
-                };
-
-                if agent == "none" {
-                    tracing::info!(
-                        "skipping task: {:?} as it does not match with any agent",
-                        task
-                    );
-                    continue;
-                }
-
-                let res = master.send_task_to_agent(agent, task_c).await;
-
-                tracing::info!("task: {:?}, res: {:?}", task, res);
-                results.push(res);
-            }
-
-            println!("RESULTS: ");
-            
-            for (n, result) in results.iter().enumerate() {
-                match result {
-                    Ok(res) => {
-                        if res.status() == Status::Success {
-                            println!("{}. {}", n+1, res.response);
-                        } else {
-                            println!("{}. failure (agent returned: {})", n+1, res.response);
+                    let stdin = std::io::stdin();
+                    let len = 0;
+                    loop {
+                        let len = stdin.read_line(&mut line);
+                        if line.trim().is_empty() {
+                            break;
                         }
+                        input_tasks.push_back(line.trim().to_string());
+                        print!("> ");
+                        std::io::stdout().flush()?;
+                        line.clear();
                     }
-                    Err(e) => {
-                        println!("{}. failure (gRPC error: {})", n+1, e);
+                    infer_tasks(master.clone(), &mut input_tasks, &mut tasks, &parser).await?;
+
+                    let mut results = Vec::new();
+
+                    send_tasks(master.clone(), &mut tasks, &mut results).await;
+
+                    println!("--- Results ---");
+                    for (input, res) in results {
+                        println!("input: {input}\nresult: {res}");
                     }
                 }
+                "agents" => {
+                    let agents = master.list_agents();
+                    println!("--- Agents ---");
+                    for agent in agents {
+                        println!("- {}({})", agent.name(), agent.description());
+                    }
+                }
+                "exit" => {
+                    exit(0);
+                }
+                "help" | _ => {
+                    println!("--- Help ---");
+                    println!("Available commands: ");
+                    println!("\t- input: Enter a list of tasks");
+                    println!("\t- agents: List connected agents");
+                    println!("\t- help: Prints this message");
+                    println!("\t- exit: Exits the process")
+                }
             }
+
+            line.clear();
         }
     }
 }
 
-fn get_input() -> Result<String, std::io::Error> {
-    let stdin = std::io::stdin();
-
-    let mut lines = stdin.lines();
-    let mut input = "".to_string();
-    while let Some(line) = lines.next() {
-        let line = line?;
-        if line.trim().is_empty() {
-            break;
+async fn infer_tasks(
+    master: Arc<MasterAgent<ToolDB>>,
+    input_tasks: &mut VecDeque<String>,
+    tasks: &mut VecDeque<(String, TaskRequest, Option<ConnectedAgent>)>,
+    parser: &LlamaParser,
+) -> color_eyre::Result<()> {
+    while let Some(input) = input_tasks.pop_front() {
+        match master.match_agent(&input).await {
+            Ok(agent) => match parser.parse(&input, &[agent.clone()]) {
+                Ok(task) => tasks.push_back((input, task, Some(agent))),
+                Err(e) => tasks.push_back((
+                    input,
+                    TaskRequest {
+                        instruction: "fail".to_string(),
+                        args: vec![e.to_string()],
+                    },
+                    None,
+                )),
+            },
+            Err(e) => tasks.push_back((
+                input,
+                TaskRequest {
+                    instruction: "fail".to_string(),
+                    args: vec![e.to_string()],
+                },
+                None,
+            )),
         }
-        input.push_str("\n");
-        input.push_str(&line);
     }
 
-    Ok(input)
+    println!("--- Tasks ---");
+    for (i, (input, task, agent)) in tasks.iter().enumerate() {
+        if task.instruction == "fail" {
+            println!("{}. input: {} task: (skipping task. failed to parse given input into a task), agent: none", i+1, input);
+        } else if agent.is_none() {
+            println!(
+                "{}. input: {} task: (skipping task. failed to find a matching agent) agent: none",
+                i + 1,
+                input
+            );
+        } else {
+            println!(
+                "{}. input: {} task: {:?}, agent: {}",
+                i + 1,
+                input,
+                task,
+                agent.as_ref().unwrap().name()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+async fn send_tasks(
+    master: Arc<MasterAgent<ToolDB>>,
+    tasks: &mut VecDeque<(String, TaskRequest, Option<ConnectedAgent>)>,
+    results: &mut Vec<(String, String)>,
+) {
+    while let Some((input, task, agent)) = tasks.pop_back() {
+        match task.instruction.as_str() {
+            "fail" => results.push((input, "failed to complete task".to_string())),
+            _ => match agent {
+                Some(agent) => {
+                    let res = master.send_task_to_agent(agent.name(), task).await;
+                    match res {
+                        Ok(result) => match result.status() {
+                            Status::Success => results.push((input, result.response)),
+                            Status::Failure => results.push((input, result.response)),
+                        },
+                        Err(_) => {
+                            results.push((input, "failed to send task to agent".to_string()));
+                        }
+                    }
+                }
+                None => {
+                    results.push((input, "failed to find agent to complete task".to_string()));
+                }
+            },
+        }
+    }
 }

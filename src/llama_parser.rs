@@ -1,37 +1,23 @@
-use async_mutex::Mutex;
+use color_eyre::eyre::bail;
 use dyn_fmt::AsStrFormatExt;
 use rand::SeedableRng;
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use std::{cell::RefCell, convert::Infallible, path::Path, sync::Arc, borrow::Borrow};
+use std::{cell::RefCell, collections::VecDeque, path::Path};
 
 use llama_rs::{InferenceParameters, InferenceSessionParameters};
 
-use crate::{common::TaskParser, meeseeks_proto::TaskRequest};
+use crate::{common::ConnectedAgent, meeseeks_proto::TaskRequest};
 
 lazy_static::lazy_static! {
-    static ref RE: regex::Regex = regex::Regex::new(r"(?P<command>\w+)\((?P<args>.*?)\)").unwrap();
+static ref RE: regex::Regex = regex::Regex::new(r"Action: (?P<command>\w+)\[(?P<args>.*?)\]").unwrap();
 }
 
 const PROMPT_TEMPLATE: &'static str = r#"
-You are given a list of tools followed by a list of tasks. Select the most appropriate tool to complete each task. You can only use the given tools and nothing else. If no tool can complete the given task, respond with none.
-### Tools ###
-- calculate(expression)
-- tweet(topic)
-- search(query)
-- summary(topic)
-### Tasks ###
-1. what is 999 - 1?
-2. write a tweet about Github's new feature release.
-3. write a short paragraph about Elon Musk.
-4. who was the first prime minister of UK?
-### Response ###
-1. calculate(999 - 1)
-2. tweet(Github's new feature release)
-3. summary(Elon Musk)
-4. search(first prime minister of UK)
-### Tasks ###
+You run in a loop of Input, Thought and Action. I will provide the Input and you are supposed to use only Thought or Action. Use Thought to describe your thoughts about the question you have been asked. If there is no tool available, you can just respond with NONE. 
+Use Action to run one of these actions available to you:
 {}
-### Response ###
+
+{}
+Input: {}
 "#;
 
 pub struct LlamaParser {
@@ -57,21 +43,29 @@ impl LlamaParser {
         })
     }
 
-    pub fn parse(&self, input: &str, output_tasks: &mut Vec<TaskRequest>) -> color_eyre::Result<()> {
+    pub fn parse(
+        &self,
+        input: &str,
+        agents: &[ConnectedAgent],
+    ) -> color_eyre::Result<TaskRequest> {
         let mut params = InferenceSessionParameters::default();
         params.repetition_penalty_last_n = 1;
         let mut session = self.model.start_session(params);
 
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        let prompt = PROMPT_TEMPLATE.format(&[input]);
+        let prompt = construct_prompt(PROMPT_TEMPLATE, agents, input);
 
         let text = RefCell::new(String::new());
 
-        tracing::debug!("Trying to parse input:\n{}", input);
-        tracing::debug!("Using prompt: \n{}", prompt);
+        println!("Trying to parse input:\n{}", input);
+        println!("Using prompt: \n{}", prompt);
 
-        let mut sp = spinners::Spinner::new(spinners::Spinners::Dots9, "Running inference on input".into());
+        let mut sp = spinners::Spinner::new(
+            spinners::Spinners::Dots9,
+            "Running inference on input".into(),
+        );
+        
         session.inference_with_prompt(
             &self.model,
             &self.vocab,
@@ -83,7 +77,7 @@ impl LlamaParser {
                 text.borrow_mut().push_str(new_text);
                 if text.borrow().len() > prompt.len() {
                     tracing::debug!("llama is generating output: {}", new_text);
-                    if text.borrow()[prompt.len()..].contains("Tasks") {
+                    if text.borrow()[prompt.len()..].contains("Input") {
                         return Err(LlamaInferenceError::Done);
                     }
                 }
@@ -91,48 +85,76 @@ impl LlamaParser {
             },
         );
         sp.stop();
+        println!("");
 
         let text = text.into_inner();
         let text = text[prompt.len()..].trim();
-
-        tracing::debug!("llama output: {:?}", text);
-
-        let input_tasks = input.trim().split('\n');
-        let tasks = text.split('\n');
-
-        tasks.zip(input_tasks).for_each(|(line, input_line)| {
-            match RE.captures(line) {
-                Some(caps) => {
-                    let command = caps.get(1);
-                    let args = caps.get(2);
-
-                    match (command, args) {
-                        (Some(instruction), Some(args)) => {
-                            let instruction = instruction.as_str().to_owned();
-                            let args = vec![args.as_str().to_owned(), input_line.to_owned()];
-
-                            let task = TaskRequest { instruction, args };
-                            tracing::debug!("inferred new task: {:?}", task);
-                            output_tasks.push(task);
-                        }
-                        _ => {
-                            tracing::debug!("skipping task: {} since it does not match with any available tools", line);
-                        }
-                    }
-                }
-                None => {
-                    tracing::debug!("skipping task: {} since it does not match with any available tools", line);
-                }
-            }
-
+        let text = text.split('\n').nth(1).unwrap_or_else(|| {
+            ""
         });
 
-        Ok(())
+        tracing::info!("llama output: {:?}", text);
+
+        match RE.captures(text) {
+            Some(caps) => {
+                let caps = dbg!(caps);
+                let command = caps.get(1);
+                let args = caps.get(2);
+
+                match (command, args) {
+                    (Some(instruction), Some(args)) => {
+                        let instruction = instruction.as_str().to_owned();
+                        let args = vec![args.as_str().to_owned(), input.to_owned()];
+
+                        let task = TaskRequest { instruction, args };
+                        tracing::debug!("inferred new task: {:?}", task);
+
+                        Ok(task)
+                    }
+                    _ => {
+                        println!("here");
+                        bail!("failed to infer task")
+                    }
+                }
+            }
+            None => {
+                println!("or here");
+                bail!("failed to infer task")
+            }
+        }
     }
+}
+
+fn construct_prompt(template: &str, agents: &[ConnectedAgent], input: &str) -> String {
+    let mut list_tools = String::new();
+    let mut list_examples = String::new();
+
+    for agent in agents {
+        for command in &agent.commands {
+            list_tools.push_str(&format!("- {}\n", command));
+        }
+        list_examples.push('\n');
+        list_examples.push_str(&agent.examples.trim());
+    }
+
+    template.format([&list_tools, &list_examples, input.trim()])
 }
 
 #[derive(Debug, thiserror::Error)]
 enum LlamaInferenceError {
     #[error("done")]
-    Done
+    Done,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::PathBuf, str::FromStr};
+
+    use super::LlamaParser;
+
+    pub fn test_parser() -> color_eyre::Result<()> {
+        let path = PathBuf::from_str("./models/burns-lora-q4.bin").unwrap();
+        let parser = LlamaParser::init(&path).unwrap();
+        Ok(())
+    }
 }

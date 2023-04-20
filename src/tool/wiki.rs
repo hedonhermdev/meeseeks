@@ -11,6 +11,10 @@ use crate::{
 const HF_QA_API_URL: &'static str = "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2";
 const HF_SUMMARY_API_URL: &'static str = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
 
+const COMMANDS: &[&'static str] = &["summary(topic)", "question(query)"];
+const EXAMPLES: &'static str = include_str!("../../prompts/wiki.txt");
+
+
 pub struct Wiki {
     wiki: Wikipedia<wikipedia::http::default::Client>,
     client: reqwest::Client,
@@ -39,7 +43,7 @@ impl Wiki {
 
         let summary = match res[0].get("summary_text") {
             Some(summary) => summary,
-            None => color_eyre::eyre::bail!("invalid response from huggingface api"),
+            None => color_eyre::eyre::bail!("invalid response from huggingface api {}", res),
         };
 
         Ok(summary.to_string())
@@ -53,11 +57,10 @@ impl Wiki {
             }
         });
         let res: serde_json::Value = self.client.post(HF_QA_API_URL).json(&payload).send().await?.json().await?;
-        println!("res: {}", res);
         
         let answer = match res.get("answer") {
             Some(answer) => answer,
-            None => color_eyre::eyre::bail!("invalid response from huggingface api"),
+            None => color_eyre::eyre::bail!("invalid response from huggingface api: {}", res),
         };
         
         Ok(answer.to_string())
@@ -136,6 +139,14 @@ impl TaskExecutor for Wiki {
                         .to_string(),
             },
         }
+    }
+
+    fn commands<'a>(&self) -> &'a[&'a str] {
+        COMMANDS
+    }
+
+    fn examples<'a>(&self) -> &'a str {
+        EXAMPLES
     }
 }
 

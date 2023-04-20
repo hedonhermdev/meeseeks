@@ -66,6 +66,10 @@
             grpcurl
             pkg-config
             openssl
+            python310
+            python310Packages.virtualenv
+            python310Packages.pandas
+            stdenv.cc.cc.lib
           ];
         };
 

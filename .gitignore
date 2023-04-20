@@ -1,6 +1,7 @@
 /target
 .direnv/
 models/
+**/venv/
 
 
 # Added by cargo

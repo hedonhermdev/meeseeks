@@ -1,0 +1,9 @@
+Input: Write a tweet about the earthquake in Delhi.
+Thought: I use the tweet tool to write tweets.
+Action: tweet[earthquake in Delhi]
+Input: Write a tweet like you are Elon Musk.
+Thought: I use the tweet tool to write tweets.
+Action: tweet[like you are Elon Musk]
+Input: can you write a tweet praising Rick and Morty?
+Thought: I use the tweet tool to write tweets.
+Action: tweet[praising Rick and Morty]

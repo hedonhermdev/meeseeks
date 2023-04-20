@@ -1,0 +1,12 @@
+Input: What is sin(100)?
+Thought: I use calculate to evaluate math expressions.
+Action: calculate[sin(100)]
+Input: What is 17 * 9?
+Thought: I use calculate to evaluate math expressions.
+Action: calculate[17 * 9]
+Input: What is 100 + 10?
+Thought: I use calculate to evaluate math expressions.
+Action: calculate[100 + 10]
+Input: What is 67 - 18?
+Thought: I use calculate to evaluate math expressions.
+Action: calculate[67 - 18]

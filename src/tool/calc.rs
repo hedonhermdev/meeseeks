@@ -3,7 +3,10 @@ use crate::{
     meeseeks_proto::{Status, TaskRequest, TaskResponse},
 };
 
+const COMMANDS: &[&'static str] = &["calculate[mathematical expression]"];
+const EXAMPLES: &'static str = include_str!("../../prompts/calculator.txt");
 pub struct Calculator;
+
 
 #[tonic::async_trait]
 impl TaskExecutor for Calculator {
@@ -28,6 +31,14 @@ impl TaskExecutor for Calculator {
                     .to_string(),
             },
         }
+    }
+    
+    fn commands<'a>(&self) -> &'a [&'a str] {
+        COMMANDS
+    }
+
+    fn examples<'a>(&self) -> &'a str {
+        EXAMPLES
     }
 }
 
