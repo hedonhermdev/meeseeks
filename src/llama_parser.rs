@@ -43,6 +43,7 @@ impl LlamaParser {
         })
     }
 
+    #[tracing::instrument(name="parse", skip(self, agents))]
     pub fn parse(
         &self,
         input: &str,
@@ -94,7 +95,6 @@ impl LlamaParser {
 
         match RE.captures(text) {
             Some(caps) => {
-                let caps = dbg!(caps);
                 let command = caps.get(1);
                 let args = caps.get(2);
 
