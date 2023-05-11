@@ -2,6 +2,9 @@
 .direnv/
 models/
 **/venv/
+tooldb/__pycache__/
+tooldb/.chroma/
+result/
 
 
 # Added by cargo
