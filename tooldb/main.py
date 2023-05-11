@@ -2,6 +2,7 @@ import chromadb
 from flask import Flask, jsonify
 from flask import Flask, request, abort, jsonify
 from string import Template
+from uuid import uuid1
 
 COLLECTION_NAME = "connected-agents"
 DOCUMENT_TEMPLATE = Template("""
@@ -25,7 +26,7 @@ class ToolDB:
     def add_tool(self, tool):
         documents = self._make_documents(tool)
         metadatas = [{'name': tool['name']} for _ in documents]
-        ids = [tool['name'] for _ in documents]
+        ids = [str(uuid1()) for _ in documents]
         self.collection.add(
             documents=documents,
             metadatas=metadatas,
@@ -36,9 +37,10 @@ class ToolDB:
         query_texts = [query,]
         n_results = 1
         
-        results = self.collection.query(query_texts=query_texts, n_results=n_results)
+        results = self.collection.query(query_texts=query_texts, n_results=n_results, include=['metadatas'])
+        print(results)
         
-        return results['ids'][0]
+        return results['metadatas'][0][0]['name']
         
     def _make_documents(self, tool):
         docs = []
@@ -63,15 +65,12 @@ def add():
 
 @app.route("/tool/match", methods=["GET"])
 def match():
-    try:
-        query = request.args.get("task")
-        tool = tooldb.get_matching_tool(query)[0]
-        print(tool)
-        if tool == "none":
-            return jsonify({"message": "not found"}), 404
-        return jsonify({"name": tool}), 200
-    except Exception as e:
-        return jsonify({"message": "invalid request"}), 400
+    query = request.args.get("task")
+    tool = tooldb.get_matching_tool(query)
+    print(tool)
+    if tool == "none":
+        return jsonify({"message": "not found"}), 404
+    return jsonify({"name": tool}), 200
 
 if __name__ == '__main__':
     app.debug == True
