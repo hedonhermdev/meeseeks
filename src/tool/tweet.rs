@@ -6,7 +6,7 @@ use crate::{
 };
 
 const PROMPT_TEMPLATE: &'static str = r#"
-    You are aTranscript of a dialog, where the User interacts with an Assistant named Tweetu. Tweetu is helpful, kind, honest and a creative writer. Tweetu specialises in writing tweets for the user. Tweets are short creative pieces of text that have a limit of 140 characters and can contain hashtags and mention other users.
+Transcript of a dialog, where the User interacts with an Assistant named Tweetu. Tweetu is helpful, kind, honest and a creative writer. Tweetu specialises in writing tweets for the user. Tweets are short creative pieces of text that have a limit of 140 characters and can contain hashtags and mention other users.
 
 User: Can you write a tweet about the benefits of drinking coffee?
 Tweetu: Starting your day with a cup of coffee not only provides an energy boost, but also offers a range of health benefits, such as improving focus, reducing the risk of diseases, and even enhancing athletic performance. #coffeebenefits #healthylifestyle
@@ -39,7 +39,7 @@ impl Tweetu {
         }
     }
     
-    async fn get_tweet(&self, topic: &str) -> color_eyre::Result<String> {
+    async fn generate_tweet(&self, topic: &str) -> color_eyre::Result<String> {
         let prompt = PROMPT_TEMPLATE.format(&[topic]);
 
         let payload = serde_json::json!({
@@ -55,6 +55,8 @@ impl Tweetu {
         let res: serde_json::Value = self.client.post(OPENAI_COMPLETION_API_URL).json(&payload).send().await?.json().await?;
 
         println!("{:?}", res);
+        let choices = res.get("choices").ok_or(TweetuError::OpenAIAPIError(res.clone()))?;
+        let _tweet = choices[0].get("text").ok_or(TweetuError::OpenAIAPIError(res.clone()))?;
         let tweet = match res.get("choices") {
             Some(choices) => {
                 choices[0].get("text").unwrap()
@@ -72,9 +74,10 @@ impl Tweetu {
 impl TaskExecutor for Tweetu {
     async fn exec(&self, task: TaskRequest) -> TaskResponse {
         match task.instruction.as_str() {
+            // ugly hack because Llama cannot spell tweet sometimes
             "twee" | "tweet" | "tweeit" | "tweeet" => {
                 let topic = &task.args[0];
-                match self.get_tweet(topic).await {
+                match self.generate_tweet(topic).await {
                     Ok(tweet) => TaskResponse {
                         status: Status::Success.into(),
                         response: tweet
@@ -102,6 +105,12 @@ impl TaskExecutor for Tweetu {
 
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum TweetuError {
+    #[error("Invalid response from OpenAI API: {0}")]   
+    OpenAIAPIError(serde_json::Value)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{tool::Tweetu, common::TaskExecutor, meeseeks_proto::{TaskRequest, Status}};
@@ -123,3 +132,4 @@ mod tests {
         Ok(())
     }
 }
+

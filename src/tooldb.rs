@@ -1,4 +1,3 @@
-use color_eyre::eyre::bail;
 use reqwest::{Url, Client};
 
 use crate::common::{AgentMatcher, ConnectedAgent};
@@ -28,7 +27,7 @@ impl AgentMatcher for ToolDB {
         });
 
         let addr = self.addr.join("/tool/add").unwrap();
-        let res: serde_json::Value = self.client.post(addr).json(&payload).send().await?.json().await?;
+        let _res: serde_json::Value = self.client.post(addr).json(&payload).send().await?.json().await?;
 
         Ok(())
     }
@@ -36,7 +35,6 @@ impl AgentMatcher for ToolDB {
     async fn match_agent(&self, task: &str) -> Result<String, Box<dyn std::error::Error>> {
         let addr = self.addr.join("/tool/match").unwrap();
         let res: serde_json::Value = self.client.get(addr).query(&[("task", task)]).send().await?.json().await?;
-
 
         match res.get("name") {
             Some(name) => Ok(name.as_str().unwrap().to_string()),

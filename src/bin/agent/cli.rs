@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr};
 
 use clap::Parser;
 use meeseeks::{

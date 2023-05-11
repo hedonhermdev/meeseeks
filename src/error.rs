@@ -6,10 +6,10 @@ pub enum MeeseeksError {
     #[error("gRPC Error")]
     GrpcError(#[from] Status),
 
-    #[error("failed to connect")]
+    #[error("failed to connect to agent")]
     ConnectionError(#[from] tonic::transport::Error),
 
-    #[error("Failed to execute task")]
+    #[error("failed to execute task")]
     TaskExecutorError(String),
 }
 

@@ -8,7 +8,7 @@ use meeseeks::{
 use reqwest::Url;
 use std::{
     collections::VecDeque,
-    io::{self, stdin, BufRead, StdinLock, Write},
+    io::{BufRead, Write},
     net::SocketAddr,
     path::PathBuf,
     process::exit,
@@ -81,9 +81,9 @@ impl MasterCli {
                     std::io::stdout().flush()?;
 
                     let stdin = std::io::stdin();
-                    let len = 0;
+                    let _len = 0;
                     loop {
-                        let len = stdin.read_line(&mut line);
+                        let _len = stdin.read_line(&mut line);
                         if line.trim().is_empty() {
                             break;
                         }

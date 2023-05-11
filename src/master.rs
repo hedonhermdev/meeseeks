@@ -98,7 +98,7 @@ impl<Matcher: AgentMatcher + Send + Sync + 'static> meeseeks_proto::master_agent
             client: None,
         };
 
-        let agent_addr = agent.addr.clone();
+        let _agent_addr = agent.addr.clone();
         let mut agents = self.agents.lock().await;
         self.matcher.add_agent(agent.clone()).await.map_err(|_| tonic::Status::new(tonic::Code::Unavailable, "failed to add agent to tooldb"))?;
         agents.insert(req.name, agent);

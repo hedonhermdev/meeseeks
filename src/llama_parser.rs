@@ -1,9 +1,9 @@
 use color_eyre::eyre::bail;
 use dyn_fmt::AsStrFormatExt;
 use rand::SeedableRng;
-use std::{cell::RefCell, collections::VecDeque, path::Path};
+use std::{cell::RefCell, path::Path};
 
-use llama_rs::{InferenceParameters, InferenceSessionParameters};
+use llm::{InferenceParameters, InferenceSessionParameters, ModelParameters, Model, InferenceWithPromptParameters};
 
 use crate::{common::ConnectedAgent, meeseeks_proto::TaskRequest};
 
@@ -21,14 +21,14 @@ Input: {}
 "#;
 
 pub struct LlamaParser {
-    model: llama_rs::Model,
-    vocab: llama_rs::Vocabulary,
+    model: llm::models::Llama,
     inference_params: InferenceParameters,
 }
 
 impl LlamaParser {
     pub fn init(model_path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let (model, vocab) = llama_rs::Model::load(model_path, 512, |_| ())?;
+        let params = ModelParameters::default();
+        let model = llm::models::Llama::load(model_path, true, params, |_| ())?;
         let inference_params = InferenceParameters {
             temperature: 0.1,
             top_k: 10000,
@@ -38,7 +38,6 @@ impl LlamaParser {
 
         Ok(Self {
             model,
-            vocab,
             inference_params,
         })
     }
@@ -64,12 +63,13 @@ impl LlamaParser {
             "Running inference on input".into(),
         );
         
-        session.inference_with_prompt(
+        let prompt_params = InferenceWithPromptParameters::default();
+
+        match session.infer_with_params(
             &self.model,
-            &self.vocab,
             &self.inference_params,
+            &prompt_params,
             &prompt,
-            Some(512),
             &mut rng,
             |new_text| {
                 text.borrow_mut().push_str(new_text);
@@ -81,7 +81,11 @@ impl LlamaParser {
                 }
                 Ok(())
             },
-        );
+        ) {
+            Ok(_) => (),
+            Err(_) => ()
+        }
+
         sp.stop();
         println!("");
 
@@ -139,17 +143,4 @@ fn construct_prompt(template: &str, agents: &[ConnectedAgent], input: &str) -> S
 enum LlamaInferenceError {
     #[error("done")]
     Done,
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{path::PathBuf, str::FromStr};
-
-    use super::LlamaParser;
-
-    pub fn test_parser() -> color_eyre::Result<()> {
-        let path = PathBuf::from_str("./models/burns-lora-q4.bin").unwrap();
-        let parser = LlamaParser::init(&path).unwrap();
-        Ok(())
-    }
 }
