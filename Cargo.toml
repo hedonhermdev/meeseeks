@@ -26,14 +26,15 @@ reqwest = { version = "0.11", features = ["json"] }
 serde = "1.0.160"
 serde_json = "1.0.96"
 futures = "0.3.28"
-llm = { version = "0.1.0-rc1", features = ["llama"] }
+llm = { git = "https://github.com/rustformers/llm", rev = "67ee7530eac0e625a2e8b0ae164bd7c32b66de97", optional = true }
 
 [features]
+master = ["dep:llm"]
 wiki-agent = ["dep:wikipedia"]
 calc-agent = ["dep:meval"]
 tweetu-agent = []
 all-agents = ["wiki-agent", "calc-agent", "tweetu-agent"]
-default = ["all-agents"]
+default = ["master", "all-agents"]
 
 [build-dependencies]
 tonic-build = "0.9"

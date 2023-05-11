@@ -3,7 +3,7 @@ use dyn_fmt::AsStrFormatExt;
 use rand::SeedableRng;
 use std::{cell::RefCell, path::Path};
 
-use llm::{InferenceParameters, InferenceSessionParameters, ModelParameters, Model, InferenceWithPromptParameters};
+use llm::{KnownModel, InferenceParameters, ModelParameters, InferenceRequest, InferenceSessionConfig};
 
 use crate::{common::ConnectedAgent, meeseeks_proto::TaskRequest};
 
@@ -28,7 +28,7 @@ pub struct LlamaParser {
 impl LlamaParser {
     pub fn init(model_path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let params = ModelParameters::default();
-        let model = llm::models::Llama::load(model_path, true, params, |_| ())?;
+        let model = llm::models::Llama::load(model_path, params, |_| ())?;
         let inference_params = InferenceParameters {
             temperature: 0.1,
             top_k: 10000,
@@ -48,9 +48,8 @@ impl LlamaParser {
         input: &str,
         agents: &[ConnectedAgent],
     ) -> color_eyre::Result<TaskRequest> {
-        let mut params = InferenceSessionParameters::default();
-        params.repetition_penalty_last_n = 1;
-        let mut session = self.model.start_session(params);
+        let session_config = InferenceSessionConfig::default();
+        let mut session = self.model.start_session(session_config);
 
         let mut rng = rand::rngs::StdRng::from_entropy();
 
@@ -63,14 +62,16 @@ impl LlamaParser {
             "Running inference on input".into(),
         );
         
-        let prompt_params = InferenceWithPromptParameters::default();
+        let mut infer_req = InferenceRequest::default();
+        infer_req.prompt = &prompt;
+        infer_req.maximum_token_count = Some(1024);
+        infer_req.parameters = Some(&self.inference_params);
 
-        match session.infer_with_params(
+        match session.infer(
             &self.model,
-            &self.inference_params,
-            &prompt_params,
-            &prompt,
             &mut rng,
+            &mut infer_req,
+            &mut Default::default(),
             |new_text| {
                 text.borrow_mut().push_str(new_text);
                 if text.borrow().len() > prompt.len() {

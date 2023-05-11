@@ -8,7 +8,7 @@ use meeseeks::{
 use reqwest::Url;
 use std::{
     collections::VecDeque,
-    io::{BufRead, Write},
+    io::Write,
     net::SocketAddr,
     path::PathBuf,
     process::exit,
@@ -66,14 +66,11 @@ impl MasterCli {
         let mut line = String::new();
         let mut input_tasks = VecDeque::new();
         let mut tasks = VecDeque::new();
-        let mut len = 0;
 
         loop {
             println!("--- Command --- (enter help for a list of commands) ");
             print!("> ");
             std::io::stdout().flush()?;
-            let stdin = std::io::stdin();
-            len = stdin.read_line(&mut line)?;
             match line.trim() {
                 "input" => {
                     println!("--- Input --- ");

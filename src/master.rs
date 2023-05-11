@@ -1,3 +1,4 @@
+
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use color_eyre::eyre::bail;
 use tonic::{Request, Response, Status};
@@ -13,7 +14,9 @@ use crate::{
 };
 
 pub struct MasterAgent<Matcher: AgentMatcher> {
+    #[allow(dead_code)]
     name: String,
+    #[allow(dead_code)]
     addr: SocketAddr,
     agents: Arc<Mutex<HashMap<String, ConnectedAgent>>>,
     matcher: Matcher,
